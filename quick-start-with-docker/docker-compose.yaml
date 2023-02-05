@@ -1,0 +1,68 @@
+version: '3'
+services:
+  database:
+    container_name: wolf-database
+    image: postgres:13
+    restart: always
+    environment:
+      POSTGRES_USER: wolfroot
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: wolf
+    ports:
+      - "5432:5432"
+    volumes:
+      - ../server/script/db-psql.sql:/docker-entrypoint-initdb.d/db.sql:ro
+  cache:
+    container_name: wolf-cache
+    image: redis:5.0
+    restart: always
+  server:
+    container_name: wolf-server
+    image: igeeky/wolf-server
+    restart: always
+    ports:
+      - "12180:12180"
+    depends_on:
+      - database
+    environment:
+      RBAC_ROOT_PASSWORD: wolf-123456
+      RBAC_TOKEN_KEY: f40215a5f25cbb6d36df07629aaf1172240xe489
+      WOLF_CRYPT_KEY: fbd4962351924792cb5e5b131435cd30b24a3571
+      RBAC_SQL_URL:  postgres://wolfroot:123456@database:5432/wolf
+      RBAC_REDIS_URL:  redis://cache:6379/0
+      MEM_CACHE_BY_REDIS: "yes"
+      CLIENT_CHANGE_PWD: "no"
+    command: npm run start
+  agent-or:
+    container_name: wolf-agent-or
+    image: igeeky/wolf-agent
+    restart: always
+    ports:
+     - "12182:12182"
+    depends_on:
+      - server
+    environment:
+      BACKEND_URL: http://openresty.org
+      RBAC_SERVER_URL: http://server:12180
+      RBAC_APP_ID: openresty
+  restful-demo:
+    container_name: restful-demo
+    image: igeeky/restful-demo:latest
+    restart: always
+    ports:
+     - "10090:10090"
+  agent-demo:
+    container_name: wolf-agent-demo
+    image: igeeky/wolf-agent
+    restart: always
+    ports:
+     - "12184:12184"
+    depends_on:
+      - server
+      - restful-demo
+    environment:
+      BACKEND_URL: http://restful-demo:10090
+      RBAC_SERVER_URL: http://server:12180
+      RBAC_APP_ID: restful-demo
+      AGENT_PORT: 12184
+      EXTENSION_CONFIG: include /opt/wolf/agent/conf/no-permission-demo.conf;
